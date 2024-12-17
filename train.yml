@@ -1,0 +1,85 @@
+---
+TAG: APGCC
+SEED: 1229
+GPU_ID: 0
+OUTPUT_DIR: '/content/drive/MyDrive/APGCC/apgcc/output'
+VIS: false
+
+MODEL:
+  ENCODER: vgg16_bn
+  ENCODER_kwargs:
+    last_pool: false
+
+  DECODER: basic
+  DECODER_kwargs:
+    num_classes: 2
+    inner_planes: 256
+    feat_layers: [3, 4]
+    pos_dim: 2
+    ultra_pe: false
+    learn_pe: false
+    unfold: false
+    local: false
+    no_aspp: true
+    require_grad: true
+    out_type: Normal
+    head_layers: [1024, 512, 256, 256]
+  STRIDE: 8
+  ROW: 2
+  LINE: 2
+  FROZEN_WEIGHTS: null
+  POINT_LOSS_COEF: 0.0002
+  EOS_COEF: 0.5
+  LOSS: ['L2']
+  WEIGHT_DICT:
+    loss_ce: 1
+    loss_points: 0.0
+    loss_aux: 0.0
+  AUX_EN: false
+  AUX_NUMBER: [1, 1]
+  AUX_RANGE: [1, 4]
+  AUX_kwargs:
+    pos_coef: 1.0
+    neg_coef: 1.0
+    pos_loc: 0.0
+    neg_loc: 0.0
+
+RESUME: false
+RESUME_PATH: '/content/drive/MyDrive/APGCC/apgcc/output/Set_Checkpoint_Here.txt'  # 저장된 체크포인트 경로'
+SOLVER:
+  SAVE_FREQ: 5  # Checkpoint 저장 주기 (5 에포크마다 저장)
+
+
+DATASETS:
+  DATASET: UCF_QNRF
+  DATA_ROOT: '/content/drive/MyDrive/UCF-QNRF_ECCV18'
+
+DATALOADER:
+  AUGUMENTATION: ['Normalize', 'Crop', 'Flip']
+  CROP_SIZE: 128
+  CROP_NUMBER: 4
+  UPPER_BOUNDER: -1
+  NUM_WORKERS: 2
+
+SOLVER:
+  BATCH_SIZE: 8
+  START_EPOCH: 0
+  EPOCHS: 400
+  LR: 0.0001
+  LR_BACKBONE: 0.00001
+  WEIGHT_DECAY: 0.0001
+  LR_DROP: 400
+  CLIP_MAX_NORM: 0.1
+  EVAL_FREQ: 5
+  LOG_FREQ: 10
+
+MATCHER:
+  SET_COST_CLASS: 1.0
+  SET_COST_POINT: 0.05
+
+TEST:
+  THRESHOLD: 0.5
+  WEIGHT: ''
+
+
+    
