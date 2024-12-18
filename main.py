@@ -3,8 +3,6 @@
 ## Email: f09921058@ntu.edu.tw 
 ##########################################################################
 import os, sys
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
-
 import shutil
 from pathlib import Path
 import argparse
@@ -23,7 +21,6 @@ from datasets import build_dataset
 from models import build_model
 import util.misc as utils
 from util.logger import setup_logger, AvgerageMeter, EvaluateMeter
-
 
 # In[0]: Parser
 def parse_args():
@@ -69,6 +66,7 @@ def main():
         test(cfg)
     else:
         train(cfg)
+
 # In[2]: Training Function
 def train(cfg):
     # makedir 
@@ -113,16 +111,14 @@ def train(cfg):
     print("Start training")
     start_time = time.time()
     for epoch in range(trainer.train_epoch, trainer.epochs):
-        logger.info(f"Starting Epoch {epoch + 1}/{trainer.epochs}")
         for batch in trainer.train_dl:
             trainer.step(batch)
             trainer.handle_new_batch()
         trainer.handle_new_epoch()
-        logger.info(f"Finished Epoch {epoch + 1}/{trainer.epochs}")
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     logger.info('Training time [%s]'%(total_time_str))
-    
+
 # In[3]: Testing Function
 def test(cfg):
     # makedir

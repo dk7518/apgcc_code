@@ -12,25 +12,25 @@ cfg = _C  # Alias for easy usage
 _C.TAG = 'APGCC'
 _C.SEED = 1229 # seed
 _C.GPU_ID = 0 # gpu_id, the gpu used for training
-_C.OUTPUT_DIR = '/content/drive/MyDrive/APGCC/apgcc/output' # output_dir, path where to save, empty for no saving
-_C.VIS = False # vis the predict sample
+_C.OUTPUT_DIR = '/content/drive/MyDrive/APGCC_res/apgcc/output' # output_dir, path where to save, empty for no saving
+_C.VIS = True # vis the predict sample
 
 # -----------------------------------------------------------------------------
 # MODEL
 # -----------------------------------------------------------------------------
 _C.MODEL = edict()
-_C.MODEL.ENCODER = 'vgg16_bn' # ['vgg16', 'vgg16_bn'] # backbone, Name of the convolutional backbone to use.
+_C.MODEL.ENCODER = 'resnet50_ibn_a' # ['vgg16', 'vgg16_bn'] # backbone, Name of the convolutional backbone to use.
 _C.MODEL.ENCODER_kwargs = {"last_pool": False, # last layer downsample, False:feat4(H/16,W/16), True:feat4(H/32,W/32)  
-						  } 
-						#   "layers": 4,  # select number of bodies.
-						#   "fpn": True,  
-						#   "multi_grid": True,
-						#   "zero_init_residual": True,
-						#   "replace_stride_with_dilation": [False, False, False],
-						#   "feat_dims":64} 
+						   "pretrained": True, 
+               "path": '/content/drive/MyDrive/APGCC_res/apgcc/models/resnet50_ibn_a-d9d0bb7b.pth',
+						   "layers": 4,  # select number of bodies.
+						   "fpn": True,  
+						   "multi_grid": True,
+						   "zero_init_residual": True,
+						   "replace_stride_with_dilation": [False, False, False],
+						   "feat_dims":64} 
 
-
-_C.MODEL.DECODER = 'basic' # ['basic', 'IFA','attention'] # decoder 
+_C.MODEL.DECODER = 'basic' # ['basic', 'IFA'] # decoder 
 _C.MODEL.DECODER_kwargs = { "num_classes": 2,        # output num_classes, default:2 means confindence.
 							"inner_planes": 256,     # basic: 256, IFA: 64
 							"feat_layers":[3,4],     # control the number of decoder features. [1,2,3,4]
@@ -61,14 +61,14 @@ _C.MODEL.AUX_RANGE = [1, 4]  # the randomness range of auxiliary anchors
 _C.MODEL.AUX_kwargs = {'pos_coef': 1., 'neg_coef': 1., 'pos_loc': 0., 'neg_loc': 0.} 
 
 _C.RESUME = True # resume, resume from checkpoint
-_C.RESUME_PATH = '/content/drive/MyDrive/APGCC/apgcc/output/latest.pth' # keep training weights.
+_C.RESUME_PATH = '/content/drive/MyDrive/APGCC_res/apgcc/output/latest.pth' # keep training weights.
 
 # -----------------------------------------------------------------------------
 # Dataset
 # -----------------------------------------------------------------------------
 _C.DATASETS = edict()
-_C.DATASETS.DATASET = 'UCF_QNRF' # dataset_file
-_C.DATASETS.DATA_ROOT = '/content/drive/MyDrive/UCF-QNRF_ECCV18' # data_root, path where the dataset is
+_C.DATASETS.DATASET = 'SHHA' # dataset_file
+_C.DATASETS.DATA_ROOT = './dataset_path/' # data_root, path where the dataset is
 
 # -----------------------------------------------------------------------------
 # DATALOADER
@@ -78,7 +78,7 @@ _C.DATALOADER.AUGUMENTATION = ['Normalize', 'Crop', 'Flip']
 _C.DATALOADER.CROP_SIZE = 128 		# radnom crip size for training
 _C.DATALOADER.CROP_NUMBER = 4 		# the number of training sample
 _C.DATALOADER.UPPER_BOUNDER = -1 	# the upper bounder of size
-_C.DATALOADER.NUM_WORKERS = 2 		# num_workers
+_C.DATALOADER.NUM_WORKERS = 8 		# num_workers
 
 # ---------------------------------------------------------------------------- #
 # Solver
@@ -86,15 +86,15 @@ _C.DATALOADER.NUM_WORKERS = 2 		# num_workers
 _C.SOLVER = edict()
 _C.SOLVER.BATCH_SIZE = 8 # batch_size\
 _C.SOLVER.START_EPOCH = 0 # start_epoch
-_C.SOLVER.EPOCHS = 400  # epochs
+_C.SOLVER.EPOCHS = 3500  # epochs
 _C.SOLVER.LR = 1e-4    # lr
 _C.SOLVER.LR_BACKBONE = 1e-5   # lr_backbone
 _C.SOLVER.WEIGHT_DECAY = 1e-4  # weight_decay
-_C.SOLVER.LR_DROP = 400 # lr_drop
+_C.SOLVER.LR_DROP = 3500 # lr_drop
 _C.SOLVER.CLIP_MAX_NORM = 0.1 # clip_max_norm, gradient clipping max norm
 
-_C.SOLVER.EVAL_FREQ = 10 # eval_freq, frequency of evaluation, default setting is evaluating in every 5 epoch
-_C.SOLVER.LOG_FREQ = 10 # log_freq, frequency of recording training.
+_C.SOLVER.EVAL_FREQ =1 # eval_freq, frequency of evaluation, default setting is evaluating in every 5 epoch
+_C.SOLVER.LOG_FREQ = 1 # log_freq, frequency of recording training.
 # ---------------------------------------------------------------------------- #
 # Matcher
 # ---------------------------------------------------------------------------- #
@@ -105,13 +105,11 @@ _C.MATCHER.SET_COST_POINT = 0.05 # set_cost_point, L1 point coefficient in the m
 # -----------------------------------------------------------------------------
 # TEST
 # -----------------------------------------------------------------------------
+_C.EVAL_MODE = False  # 평가 모드 활성화 여부, 기본값은 False
 _C.TEST = edict()
 _C.TEST.THRESHOLD = 0.5
 _C.TEST.WEIGHT = ""
-# -----------------------------------------------------------------------------
-# 추가: EVAL_MODE
-# -----------------------------------------------------------------------------
-_C.EVAL_MODE = False  # 기본값을 False로 설정 (훈련 모드)
+
 ################ modules ################
 def cfg_merge_a2b(a, b):
     if type(a) is not edict and type(a) is not dict:

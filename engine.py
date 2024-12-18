@@ -64,100 +64,41 @@ class Trainer(object):
 
         self.optimizer = torch.optim.Adam(param_dicts, lr=self.cfg.SOLVER.LR)
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.cfg.SOLVER.LR_DROP)
-       
         if self.cfg.MODEL.FROZEN_WEIGHTS is not None:
             checkpoint = torch.load(self.cfg.MODEL.FROZEN_WEIGHTS, map_location='cpu')
             self.model_without_ddp.detr.load_state_dict(checkpoint['model'])
 
         # if self.cfg.RESUME:
-        #     checkpoint = torch.load(self.cfg.RESUME_PATH, map_location='cpu')
-        #     self.model_without_ddp.load_state_dict(checkpoint['model_state_dict'])
-        #     if not self.cfg.EVAL_MODE and 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
+        #     checkpoint = torch.load(self.cfg.RESUME, map_location='cpu')
+        #     self.model_without_ddp.load_state_dict(checkpoint['model'])
+        #     if not self.cfg.eval and 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
         #         self.optimizer.load_state_dict(checkpoint['optimizer'])
         #         self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         #         self.cfg.SOLVER.START_EPOCH = checkpoint['epoch'] + 1
         #         self.train_epoch = checkpoint['epoch'] + 1
- # 체크포인트 로드 (RESUME)
         if self.cfg.RESUME:
-            checkpoint = torch.load(self.cfg.RESUME_PATH, map_location='cpu')
+            checkpoint_path = self.cfg.RESUME_PATH  # 체크포인트 경로 가져오기
+            if not os.path.isfile(checkpoint_path):
+                raise FileNotFoundError(f"Checkpoint file not found at: {checkpoint_path}")
             
-            # 모델 상태 로드: 'model_state_dict' 또는 'model' 키 지원
-            if 'model_state_dict' in checkpoint:
-                self.model_without_ddp.load_state_dict(checkpoint['model_state_dict'])
-                self.logger.info("Loaded 'model_state_dict' from checkpoint.")
-            elif 'model' in checkpoint:
-                self.model_without_ddp.load_state_dict(checkpoint['model'])
-                self.logger.info("Loaded 'model' from checkpoint.")
-            else:
-                raise KeyError("No valid model state found in checkpoint.")
-            
-            # 옵티마이저, 스케줄러, 에포크 정보 로드
-            if not self.cfg.EVAL_MODE and 'optimizer_state_dict' in checkpoint and 'lr_scheduler_state_dict' in checkpoint and 'epoch' in checkpoint:
-                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-                self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
+            # 체크포인트 불러오기
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')  
+            self.logger.info(f"Resuming training from checkpoint: {checkpoint_path}")
+
+            # 모델, 옵티마이저, 스케줄러 상태 로드
+            self.model_without_ddp.load_state_dict(checkpoint['model'])  
+            if not self.cfg.EVAL_MODE and 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+                self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
                 self.cfg.SOLVER.START_EPOCH = checkpoint['epoch'] + 1
                 self.train_epoch = checkpoint['epoch'] + 1
-                self.best_metrics = checkpoint.get('best_metrics', None)
-                self.logger.info(f"Resumed training from epoch {self.train_epoch}")
-            else:
-                self.train_epoch = self.cfg.SOLVER.START_EPOCH
-                self.logger.info("Starting training from the specified start epoch.")
-
-        #RESUME용 코드 
-    def save_checkpoint(self, epoch, checkpoint_path):
-        checkpoint = {
-            'epoch': epoch,  # 현재 에포크 저장
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'best_metrics': self.best_metrics,
-            'lr_scheduler_state_dict': self.lr_scheduler.state_dict(),
-        }
-        torch.save(checkpoint, checkpoint_path)
-        self.logger.info(f"Checkpoint saved at {checkpoint_path}")
-
-    # def load_checkpoint(self, checkpoint_path):
-    #     checkpoint = torch.load(checkpoint_path)
-    #     self.model.load_state_dict(checkpoint['model_state_dict'])
-    #     self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    #     self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
-    #     self.best_metrics = checkpoint.get('best_metrics', None)
-    #     start_epoch = checkpoint['epoch']
-    #     self.logger.info(f"Checkpoint loaded: Resuming from epoch {start_epoch}")
-    #     return start_epoch
-   # Load checkpoint
-    def load_checkpoint(self, checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        
-        # 모델 상태 로드: 'model_state_dict' 또는 'model' 키 지원
-        if 'model_state_dict' in checkpoint:
-            self.model.load_state_dict(checkpoint['model_state_dict'])
-            self.logger.info("Loaded 'model_state_dict' from checkpoint.")
-        elif 'model' in checkpoint:
-            self.model.load_state_dict(checkpoint['model'])
-            self.logger.info("Loaded 'model' from checkpoint.")
         else:
-            raise KeyError("No valid model state found in checkpoint.")
-        
-        # 옵티마이저 상태 로드
-        if 'optimizer_state_dict' in checkpoint:
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            self.logger.info("Loaded 'optimizer_state_dict' from checkpoint.")
-        
-        # 스케줄러 상태 로드
-        if 'lr_scheduler_state_dict' in checkpoint:
-            self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
-            self.logger.info("Loaded 'lr_scheduler_state_dict' from checkpoint.")
-        
-        # 기타 정보 로드
-        self.best_metrics = checkpoint.get('best_metrics', None)
-        start_epoch = checkpoint.get('epoch', 0)
-        self.logger.info(f"Checkpoint loaded: Resuming from epoch {start_epoch}")
-        return start_epoch
+            self.train_epoch = self.cfg.SOLVER.START_EPOCH  # 처음부터 시작
 
     def handle_new_batch(self):
         self.batch_cnt += 1
         self.metric_logger.synchronize_between_processes()
-
+        
     def handle_new_epoch(self):
         self.batch_cnt = 1
         self.lr_scheduler.step()
@@ -167,7 +108,6 @@ class Trainer(object):
             self.log_train[k].update(stat[k])
 
         if self.train_epoch % self.log_period == 0:
-        
             logger_text = "[ep %d][lr %.7f][%.2fs]:"%(self.train_epoch, self.optimizer.param_groups[0]['lr'], time.time() - self.curr_time)
             for k in self.log_train.keys():
                 logger_text += ' %s=%.8f/%.8f'%(k, stat[k], self.log_train[k].avg)
@@ -176,42 +116,27 @@ class Trainer(object):
             for k in self.log_train.keys():
                 self.writer.add_scalar('loss/%s'%k, stat[k], self.train_epoch)
 
-        device = next(self.model.parameters()).device
-        t1 = time.time()
-        
-        result = evaluate_crowd_counting(self.model, self.val_dl, device)
-        t2 = time.time()
-        self.log_eval.update(result[0], result[1], self.train_epoch)  # mae, mse, ep
-        self.logger.info('[ep %d] Eval: MAE=%.6f/%.6f, MSE=%.6f/%.6f, Best[ep %d]: MAE=%.6f, MSE=%.6f, time:%.2fs  \n'
-                                    %(self.train_epoch, 
-                                      result[0], self.log_eval.MAE_avg, 
-                                      result[1], self.log_eval.MSE_avg, 
-                                      self.log_eval.best_ep, self.log_eval.MAE_min, self.log_eval.MSE_min, 
-                                      t2 - t1))
-        self.writer.add_scalar('metric/mae', result[0], self.train_epoch)
-        self.writer.add_scalar('metric/mse', result[1], self.train_epoch)
+        if self.train_epoch % self.eval_period == 0 and self.train_epoch != 0:
+            t1 = time.time()
+            result = evaluate_crowd_counting(self.model, self.val_dl, next(self.model.parameters()).device)
+            t2 = time.time()
 
-        if abs(self.log_eval.MAE_min - result[0]) < 0.01:
-                        self.save()
+            self.log_eval.update(result[0], result[1], self.train_epoch)  # mae, mse, ep
+            self.logger.info('[ep %d] Eval: MAE=%.6f/%.6f, MSE=%.6f/%.6f, Best[ep %d]: MAE=%.6f, MSE=%.6f, time:%.2fs  \n'
+                            %(self.train_epoch, 
+                              result[0], self.log_eval.MAE_avg, 
+                              result[1], self.log_eval.MSE_avg, 
+                              self.log_eval.best_ep, self.log_eval.MAE_min, self.log_eval.MSE_min, 
+                              t2 - t1))
+            self.writer.add_scalar('metric/mae', result[0], self.train_epoch)
+            self.writer.add_scalar('metric/mse', result[1], self.train_epoch)
+
+            if abs(self.log_eval.MAE_min - result[0]) < 0.01:
+                self.save()
             
         checkpoint_latest_path = os.path.join(self.output_dir, 'latest.pth')
         torch.save({'model': self.model_without_ddp.state_dict()}, checkpoint_latest_path)
-        # Save Checkpoint
-        checkpoint_path = os.path.join(self.output_dir, 'checkpoint_epoch_%d.pth' % self.train_epoch)
-        checkpoint = {
-            'epoch': self.train_epoch,
-            'model_state_dict': self.model_without_ddp.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'lr_scheduler_state_dict': self.lr_scheduler.state_dict(),
-            'cfg': self.cfg,
-        }
-        # torch.save(checkpoint, checkpoint_path)
-        # self.logger.info(f"Checkpoint saved to {checkpoint_path}")
-
-        # 기존 코드에서 'model' 키로 저장하고 있었다면, 이를 'model_state_dict'로 수정
-        torch.save({'model_state_dict': self.model_without_ddp.state_dict()}, checkpoint_latest_path)
-        self.logger.info(f"Latest checkpoint saved to {checkpoint_latest_path}")
-
+        
         self.metric_logger = utils.MetricLogger(delimiter="  ")
         self.metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
         self.train_epoch += 1
@@ -257,42 +182,18 @@ class Trainer(object):
         self.metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
         self.metric_logger.update(lr=self.optimizer.param_groups[0]["lr"])
 
-    # def save(self, ):
-    #     checkpoint_best_path = os.path.join(self.output_dir, 'best_ep%d__%.5f_%.5f.pth' %\
-    #                                         (self.log_eval.best_ep, self.log_eval.MAE_min, self.log_eval.MSE_min))
-    #     torch.save(self.model_without_ddp.state_dict(), checkpoint_best_path)
-    #     self.best_models.append(checkpoint_best_path)
-    #     if len(best_models) > 10:
-    #         if os.path.isfile(self.best_models[0]):
-    #             os.remove(self.best_models[0])
-    #         self.best_models.remove(self.best_models[0])
-
-    #     shutil.copy(self.best_models[-1], os.path.join(self.output_dir, 'best.pth'))
-    def save(self):
-        # 체크포인트 경로 생성
-        checkpoint_best_path = os.path.join(
-            self.output_dir,
-            'best_ep%d__%.5f_%.5f.pth' % (
-                self.log_eval.best_ep, 
-                self.log_eval.MAE_min, 
-                self.log_eval.MSE_min
-            )
-        )
-        
-        # 모델 상태 저장
+    def save(self, ):
+        checkpoint_best_path = os.path.join(self.output_dir, 'best_ep%d__%.5f_%.5f.pth' %\
+                                            (self.log_eval.best_ep, self.log_eval.MAE_min, self.log_eval.MSE_min))
         torch.save(self.model_without_ddp.state_dict(), checkpoint_best_path)
-        
-        # best_models 리스트에 추가
         self.best_models.append(checkpoint_best_path)
-
-        # best_models의 길이가 10을 초과하면 가장 오래된 파일 삭제
         if len(self.best_models) > 10:
             if os.path.isfile(self.best_models[0]):
                 os.remove(self.best_models[0])
-            self.best_models.pop(0)  # 리스트에서 첫 번째 항목 제거
+            self.best_models.remove(self.best_models[0])
 
-        # 최신 최적의 모델을 best.pth로 복사
         shutil.copy(self.best_models[-1], os.path.join(self.output_dir, 'best.pth'))
+
 # the inference routine
 @torch.no_grad()
 def evaluate_crowd_counting(model, data_loader, device, threshold=0.5, vis_dir=None):
@@ -378,7 +279,7 @@ def evaluate_crowd_counting_and_loc(model, data_loader, device, threshold=0.5, v
         et_sum += predict_cnt
         tp_sum_8 += tp_8
 
-    # calc MAE, MSE
+    # calc MAE, RMSE
     mae = np.mean(maes)
     mse = np.sqrt(np.mean(mses))
 
@@ -391,3 +292,4 @@ def evaluate_crowd_counting_and_loc(model, data_loader, device, threshold=0.5, v
     f1_8 = 2*ap_8*ar_8 / (ap_8+ar_8+1e-10)
     local_result = {'ap_4': ap_4, 'ar_4':ar_4, 'f1_4':f1_4, 'ap_8': ap_8, 'ar_8':ar_8, 'f1_8':f1_8}
     return mae, mse, local_result
+
